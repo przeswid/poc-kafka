@@ -1,0 +1,108 @@
+version: '3'
+services:
+  zookeeper-1:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_SERVER_ID: 1       # Unique Zookeeper server ID
+      ZOOKEEPER_CLIENT_PORT: 2181  # The port to listen for client connections
+      ZOOKEEPER_TICK_TIME: 2000    # The basic time unit in milliseconds used by ZooKeeper. This is used to do heartbeats, and the minimum session timeout will be twice the tickTime.
+    ports:
+      - 22181:2181
+
+  zookeeper-2:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_SERVER_ID: 2       # Unique Zookeeper server ID
+      ZOOKEEPER_CLIENT_PORT: 2181  # The port to listen for client connections
+      ZOOKEEPER_TICK_TIME: 2000    # The basic time unit in milliseconds used by ZooKeeper. This is used to do heartbeats, and the minimum session timeout will be twice the tickTime.
+    ports:
+      - 32181:2181
+
+  zookeeper-3:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_SERVER_ID: 3       # Unique Zookeeper server ID
+      ZOOKEEPER_CLIENT_PORT: 2181  # The port to listen for client connections
+      ZOOKEEPER_TICK_TIME: 2000    # The basic time unit in milliseconds used by ZooKeeper. This is used to do heartbeats, and the minimum session timeout will be twice the tickTime.
+    ports:
+      - 42181:2181
+
+  kafka-1:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
+    restart: on-failure
+    ports:
+      - 29092:29092
+    environment:
+      KAFKA_BROKER_ID: 1   # Unique Broker server ID
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181 # Zookeeper addresses
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-1:9092,EXTERNAL://localhost:29092 #You need to set advertised.listeners
+      # (or KAFKA_ADVERTISED_LISTENERS if you’re using Docker images) to the external address (host/IP) so that clients can correctly connect to it.
+      # Otherwise, they’ll try to connect to the internal host address—and if that’s not reachable, then problems ensue.
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  kafka-2:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
+    restart: on-failure
+    ports:
+      - 39092:39092
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-2:9092,EXTERNAL://localhost:39092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  kafka-3:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
+    restart: on-failure
+    ports:
+      - 59092:59092
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-3:9092,EXTERNAL://localhost:59092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: kafka-ui
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    ports:
+      - 9080:8080
+    restart: always
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka-1:9092,kafka-2:9092,kafka-3:9092
+
+  kowl:
+    image: quay.io/cloudhut/kowl:v1.4.0
+    restart: on-failure
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    volumes:
+      - ./config.yaml:/etc/kowl/config.yaml
+    ports:
+      - 9090:8080
+    entrypoint: ./kowl --config.filepath=/etc/kowl/config.yaml
